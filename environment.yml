@@ -1,0 +1,34 @@
+name: ldm
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - pytorch-lightning
+  - cupy
+  - pkg-config
+  - compilers
+  - libjpeg-turbo
+  - opencv
+  - pip
+  - numba
+  - numpy
+  - pip:
+    - albumentations
+    - pudb
+    - imageio
+    - imageio-ffmpeg
+    - omegaconf
+    - test-tube
+    - streamlit
+    - einops
+    - torch-fidelity
+    - transformers
+    - ffcv
+    - wandb
+    - -e .
+    #- -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
+    #- -e git+https://github.com/openai/CLIP.git@main#egg=clip

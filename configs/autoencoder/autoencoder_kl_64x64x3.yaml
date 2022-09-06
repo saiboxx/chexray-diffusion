@@ -27,18 +27,10 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 12
-    wrap: True
-    train:
-      target: ldm.data.imagenet.ImageNetSRTrain
-      params:
-        size: 256
-        degradation: pil_nearest
-    validation:
-      target: ldm.data.imagenet.ImageNetSRValidation
-      params:
-        size: 256
-        degradation: pil_nearest
+    batch_size: 8
+    train_path: /data/core-rad/chestx-ray/chestx-ray_train.beton
+    val_path: /data/core-rad/chestx-ray/chestx-ray_test.beton
+    num_workers: 16
 
 lightning:
   callbacks:
@@ -50,5 +42,7 @@ lightning:
         increase_log_steps: True
 
   trainer:
-    benchmark: True
+    gpus: 4
+    benchmark: False
+    precision: 32
     accumulate_grad_batches: 2

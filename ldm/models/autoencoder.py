@@ -10,6 +10,7 @@ from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 
 from ldm.util import instantiate_from_config
 
+from torchvision.transforms.functional import resize
 
 class VQModel(pl.LightningModule):
     def __init__(self,
@@ -342,10 +343,11 @@ class AutoencoderKL(pl.LightningModule):
         return dec, posterior
 
     def get_input(self, batch, k):
-        x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        x = batch[0]
+        # x = batch[k]
+        # if len(x.shape) == 3:
+        #     x = x[..., None]
+        # x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
         return x
 
     def training_step(self, batch, batch_idx, optimizer_idx):
