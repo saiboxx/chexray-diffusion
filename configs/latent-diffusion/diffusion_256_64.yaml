@@ -34,13 +34,12 @@ model:
         - 4
         num_head_channels: 32
     first_stage_config:
-      target: ldm.models.autoencoder.VQModelInterface
+      target: ldm.models.autoencoder.AutoencoderKL
       params:
         embed_dim: 3
-        n_embed: 8192
-        ckpt_path: configs/first_stage_models/vq-f4/model.yaml
+        ckpt_path: checkpoints/autoencoder_64.ckpt
         ddconfig:
-          double_z: false
+          double_z: True
           z_channels: 3
           resolution: 256
           in_channels: 3
@@ -59,17 +58,10 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 42
-    num_workers: 5
-    wrap: false
-    train:
-      target: taming.data.faceshq.FFHQTrain
-      params:
-        size: 256
-    validation:
-      target: taming.data.faceshq.FFHQValidation
-      params:
-        size: 256
+    batch_size: 32
+    train_path: /data/core-rad/chestx-ray/chestx-ray_train.beton
+    val_path: /data/core-rad/chestx-ray/chestx-ray_test.beton
+    num_workers: 16
 
 
 lightning:
@@ -82,4 +74,5 @@ lightning:
         increase_log_steps: False
 
   trainer:
-    benchmark: True
+    gpus: 4
+    benchmark: False

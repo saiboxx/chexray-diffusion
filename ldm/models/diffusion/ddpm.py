@@ -327,11 +327,12 @@ class DDPM(pl.LightningModule):
         return self.p_losses(x, t, *args, **kwargs)
 
     def get_input(self, batch, k):
-        x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
-        x = x.to(memory_format=torch.contiguous_format).float()
+        x = batch['img']
+        # x = batch[k]
+        # if len(x.shape) == 3:
+        #     x = x[..., None]
+        # x = rearrange(x, 'b h w c -> b c h w')
+        # x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
     def shared_step(self, batch):

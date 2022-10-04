@@ -44,7 +44,7 @@ lightning:
         increase_log_steps: True
 
   trainer:
-    gpus: 4
+    gpus: 8
     benchmark: False
     precision: 32
-    accumulate_grad_batches: 2
+    #accumulate_grad_batches: 2

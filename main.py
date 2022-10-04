@@ -1,31 +1,34 @@
-import argparse, os, sys, datetime, glob, importlib, csv
-import numpy as np
+import argparse
+import datetime
+import glob
+import json
+import os
+import sys
 import time
+import warnings
+from typing import Dict, Optional
+
+import numpy as np
+import pytorch_lightning as pl
 import torch
 import torchvision
-import pytorch_lightning as pl
-
-from packaging import version
-from omegaconf import OmegaConf
-from torch.utils.data import random_split, DataLoader, Dataset, Subset
-from functools import partial
 from PIL import Image
-
+from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
+from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.trainer import Trainer
+from pytorch_lightning.utilities import rank_zero_info
+from pytorch_lightning.utilities.distributed import rank_zero_only
+from torch.utils.data import random_split, DataLoader, Dataset, ConcatDataset
+# from ffcv.loader import Loader, OrderOption
+# from ffcv.transforms import ToTensor, ToDevice, ToTorchImage, Convert, NormalizeImage
+# from ffcv.fields.decoders import
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
 from pytorch_lightning.utilities.distributed import rank_zero_only
-from pytorch_lightning.utilities import rank_zero_info
-
-from ffcv.loader import Loader, OrderOption
-from ffcv.transforms import ToTensor, ToDevice, ToTorchImage, Convert, NormalizeImage
-from ffcv.fields.decoders import RandomResizedCropRGBImageDecoder
-import wandb
+from torchvision.transforms import Compose, ToTensor, Resize, Normalize
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config
-
-import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -168,54 +171,166 @@ def worker_init_fn(_):
     else:
         return np.random.seed(np.random.get_state()[1][0] + worker_id)
 
+########################################################################################
+########################################################################################
+### MACHEX
+########################################################################################
+########################################################################################
+class ChestXrayDataset(Dataset):
+    """Class for handling datasets in the MaCheX composition."""
+
+    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
+        """Initialize ChestXrayDataset."""
+        self.root = root
+        json_path = os.path.join(self.root, 'index.json')
+        self.index_dict = ChestXrayDataset._load_json(json_path)
+
+        self.keys = list(self.index_dict.keys())
+
+        if transforms is None:
+            self.transforms = ToTensor()
+        else:
+            self.transforms = transforms
+
+    @staticmethod
+    def _load_json(file_path: str) -> Dict:
+        """Load a json file as dictionary."""
+        with open(file_path, 'r') as f:
+            return json.load(f)
+
+    def __len__(self):
+        """Return length of the dataset."""
+        return len(self.keys)
+
+    def __getitem__(self, idx: int) -> Dict:
+        """Get dataset element."""
+        meta = self.index_dict[self.keys[idx]]
+
+        img = Image.open(meta['path'])
+        img = self.transforms(img)
+
+        return {'img': img}
+
+
+class MaCheXDataset(Dataset):
+    """Massive chest X-ray dataset."""
+
+    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
+        """Initialize MaCheXDataset"""
+        self.root = root
+        sub_dataset_roots = os.listdir(self.root)
+        datasets = [
+            ChestXrayDataset(root=os.path.join(root, r), transforms=transforms)
+            for r in sub_dataset_roots
+        ]
+        self.ds = ConcatDataset(datasets)
+
+    def __len__(self):
+        """Return length of the dataset."""
+        return len(self.ds)
+
+    def __getitem__(self, idx: int) -> Dict:
+        """Get dataset element."""
+        return self.ds[idx]
+
+########################################################################################
+########################################################################################
 
 class DataModuleFromConfig(pl.LightningDataModule):
 
     def __init__(self,
-                 batch_size, train_path, val_path, num_workers,
+                 batch_size, machex_path, test_size, num_workers,
                  *args, **kwargs):
         super().__init__()
         self.batch_size = batch_size
-        self.train_path = train_path
-        self.val_path = val_path
         self.num_workers = num_workers
 
-        self.pipeline = {
-            'img': [
-                RandomResizedCropRGBImageDecoder(
-                    (256, 256), scale=(1.0, 1.0), ratio=(1.0, 1.0)
-                ),
-                ToTensor(),
-                ToDevice('cuda'),
-                ToTorchImage(),
-                NormalizeImage(
-                    mean=np.asarray([127.5, 127.5, 127.5]),
-                    std=np.asarray([127.5, 127.5, 127.5]),
-                    type=np.float32
-                ),
-            ]}
+        self.transforms = Compose([
+            Resize(256),
+            ToTensor(),
+            Normalize(
+                mean=(0.5, 0.5, 0.5),
+                std=(0.5, 0.5, 0.5)
+            )
+        ])
+
+        self.machex = MaCheXDataset(machex_path, self.transforms)
+
+        train_size = len(self.machex) - test_size
+        self.train_dataset, self.test_dataset = random_split(
+            self.machex,
+            (train_size, test_size),
+            generator=torch.Generator().manual_seed(1337)
+        )
+
 
     def train_dataloader(self):
-        loader = Loader(
-            self.train_path,
+        loader = DataLoader(
+            dataset=self.train_dataset,
             batch_size=self.batch_size,
-            distributed=True,
             num_workers=self.num_workers,
-            order=OrderOption.RANDOM,
-            pipelines=self.pipeline
+            pin_memory=True,
+            shuffle=True
         )
         return loader
 
     def val_dataloader(self):
-        loader = Loader(
-            self.val_path,
+        loader = DataLoader(
+            dataset=self.test_dataset,
             batch_size=self.batch_size,
-            distributed=True,
             num_workers=self.num_workers,
-            order=OrderOption.SEQUENTIAL,
-            pipelines=self.pipeline
+            pin_memory=True,
+            shuffle=False
         )
         return loader
+
+# class DataModuleFromConfig(pl.LightningDataModule):
+#
+#     def __init__(self,
+#                  batch_size, train_path, val_path, num_workers,
+#                  *args, **kwargs):
+#         super().__init__()
+#         self.batch_size = batch_size
+#         self.train_path = train_path
+#         self.val_path = val_path
+#         self.num_workers = num_workers
+#
+#         self.pipeline = {
+#             'img': [
+#                 RandomResizedCropRGBImageDecoder(
+#                     (256, 256), scale=(1.0, 1.0), ratio=(1.0, 1.0)
+#                 ),
+#                 ToTensor(),
+#                 ToDevice('cuda'),
+#                 ToTorchImage(),
+#                 NormalizeImage(
+#                     mean=np.asarray([127.5, 127.5, 127.5]),
+#                     std=np.asarray([127.5, 127.5, 127.5]),
+#                     type=np.float32
+#                 ),
+#             ]}
+#
+#     def train_dataloader(self):
+#         loader = Loader(
+#             self.train_path,
+#             batch_size=self.batch_size,
+#             distributed=True,
+#             num_workers=self.num_workers,
+#             order=OrderOption.RANDOM,
+#             pipelines=self.pipeline
+#         )
+#         return loader
+#
+#     def val_dataloader(self):
+#         loader = Loader(
+#             self.val_path,
+#             batch_size=self.batch_size,
+#             distributed=True,
+#             num_workers=self.num_workers,
+#             order=OrderOption.SEQUENTIAL,
+#             pipelines=self.pipeline
+#         )
+#         return loader
 
 
 class SetupCallback(Callback):

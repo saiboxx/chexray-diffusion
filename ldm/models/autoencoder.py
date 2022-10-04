@@ -343,7 +343,7 @@ class AutoencoderKL(pl.LightningModule):
         return dec, posterior
 
     def get_input(self, batch, k):
-        x = batch[0]
+        x = batch['img']
         # x = batch[k]
         # if len(x.shape) == 3:
         #     x = x[..., None]
