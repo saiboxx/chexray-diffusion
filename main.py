@@ -25,6 +25,7 @@ from torch.utils.data import random_split, DataLoader, Dataset, ConcatDataset
 # from ffcv.fields.decoders import
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
 from pytorch_lightning.utilities.distributed import rank_zero_only
+from torch.utils.data.dataset import T_co
 from torchvision.transforms import Compose, ToTensor, Resize, Normalize
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
@@ -233,13 +234,32 @@ class MaCheXDataset(Dataset):
         """Get dataset element."""
         return self.ds[idx]
 
+
+class MimicT2IDataset(ChestXrayDataset):
+    """Mimic subset with reports."""
+
+    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
+        root = os.path.join(root, 'mimic')
+        super().__init__(root, transforms)
+
+    def __getitem__(self, idx: int) -> Dict:
+        """Get dataset element."""
+        meta = self.index_dict[self.keys[idx]]
+
+        img = Image.open(meta['path'])
+        img = self.transforms(img)
+
+        return {'img': img, 'caption': meta['report']}
+
+
+
 ########################################################################################
 ########################################################################################
 
 class DataModuleFromConfig(pl.LightningDataModule):
 
     def __init__(self,
-                 batch_size, machex_path, test_size, num_workers,
+                 batch_size, machex_path, test_size, num_workers, mimic=False,
                  *args, **kwargs):
         super().__init__()
         self.batch_size = batch_size
@@ -254,7 +274,10 @@ class DataModuleFromConfig(pl.LightningDataModule):
             )
         ])
 
-        self.machex = MaCheXDataset(machex_path, self.transforms)
+        if not mimic:
+            self.machex = MaCheXDataset(machex_path, self.transforms)
+        else:
+            self.machex = MimicT2IDataset(machex_path, self.transforms)
 
         train_size = len(self.machex) - test_size
         self.train_dataset, self.test_dataset = random_split(
@@ -283,54 +306,6 @@ class DataModuleFromConfig(pl.LightningDataModule):
             shuffle=False
         )
         return loader
-
-# class DataModuleFromConfig(pl.LightningDataModule):
-#
-#     def __init__(self,
-#                  batch_size, train_path, val_path, num_workers,
-#                  *args, **kwargs):
-#         super().__init__()
-#         self.batch_size = batch_size
-#         self.train_path = train_path
-#         self.val_path = val_path
-#         self.num_workers = num_workers
-#
-#         self.pipeline = {
-#             'img': [
-#                 RandomResizedCropRGBImageDecoder(
-#                     (256, 256), scale=(1.0, 1.0), ratio=(1.0, 1.0)
-#                 ),
-#                 ToTensor(),
-#                 ToDevice('cuda'),
-#                 ToTorchImage(),
-#                 NormalizeImage(
-#                     mean=np.asarray([127.5, 127.5, 127.5]),
-#                     std=np.asarray([127.5, 127.5, 127.5]),
-#                     type=np.float32
-#                 ),
-#             ]}
-#
-#     def train_dataloader(self):
-#         loader = Loader(
-#             self.train_path,
-#             batch_size=self.batch_size,
-#             distributed=True,
-#             num_workers=self.num_workers,
-#             order=OrderOption.RANDOM,
-#             pipelines=self.pipeline
-#         )
-#         return loader
-#
-#     def val_dataloader(self):
-#         loader = Loader(
-#             self.val_path,
-#             batch_size=self.batch_size,
-#             distributed=True,
-#             num_workers=self.num_workers,
-#             order=OrderOption.SEQUENTIAL,
-#             pipelines=self.pipeline
-#         )
-#         return loader
 
 
 class SetupCallback(Callback):
@@ -728,17 +703,17 @@ if __name__ == "__main__":
 
             'checkpoint_callback': modelckpt_cfg,
 
-            'metrics_over_trainsteps_checkpoint': {
-                "target": 'pytorch_lightning.callbacks.ModelCheckpoint',
-                'params': {
-                    "dirpath": os.path.join(ckptdir, 'trainstep_checkpoints'),
-                    "filename": "{epoch:06}-{step:09}",
-                    "verbose": True,
-                    'save_top_k': -1,
-                    'every_n_train_steps': 5000,
-                    'save_weights_only': False
-                }
-            }
+            # 'metrics_over_trainsteps_checkpoint': {
+            #     "target": 'pytorch_lightning.callbacks.ModelCheckpoint',
+            #     'params': {
+            #         "dirpath": os.path.join(ckptdir, 'trainstep_checkpoints'),
+            #         "filename": "{epoch:06}-{step:09}",
+            #         "verbose": True,
+            #         'save_top_k': -1,
+            #         'every_n_train_steps': 5000,
+            #         'save_weights_only': False
+            #     }
+            # }
         }
 
         if "callbacks" in lightning_config:
