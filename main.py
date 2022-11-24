@@ -1,12 +1,10 @@
 import argparse
 import datetime
 import glob
-import json
 import os
 import sys
 import time
 import warnings
-from typing import Dict, Optional
 
 import numpy as np
 import pytorch_lightning as pl
@@ -15,21 +13,15 @@ import torchvision
 from PIL import Image
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
-from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.utilities import rank_zero_info
-from pytorch_lightning.utilities.distributed import rank_zero_only
 from torch.utils.data import random_split, DataLoader, Dataset, ConcatDataset
-# from ffcv.loader import Loader, OrderOption
-# from ffcv.transforms import ToTensor, ToDevice, ToTorchImage, Convert, NormalizeImage
-# from ffcv.fields.decoders import
-from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
+from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities.distributed import rank_zero_only
-from torch.utils.data.dataset import T_co
 from torchvision.transforms import Compose, ToTensor, Resize, Normalize
 
-from ldm.data.base import Txt2ImgIterableBaseDataset
-from ldm.util import instantiate_from_config
+from cheff.ldm import instantiate_from_config
+from cheff.machex import MaCheXDataset, MimicT2IDataset
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -125,14 +117,6 @@ def get_parser(**parser_kwargs):
         default="logs",
         help="directory for logging dat shit",
     )
-    parser.add_argument(
-        "--scale_lr",
-        type=str2bool,
-        nargs="?",
-        const=True,
-        default=True,
-        help="scale base-lr by ngpu * batch_size * n_accumulate",
-    )
     return parser
 
 
@@ -143,118 +127,14 @@ def nondefault_trainer_args(opt):
     return sorted(k for k in vars(args) if getattr(opt, k) != getattr(args, k))
 
 
-class WrappedDataset(Dataset):
-    """Wraps an arbitrary object with __len__ and __getitem__ into a pytorch dataset"""
-
-    def __init__(self, dataset):
-        self.data = dataset
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx]
-
-
 def worker_init_fn(_):
     worker_info = torch.utils.data.get_worker_info()
 
     dataset = worker_info.dataset
     worker_id = worker_info.id
 
-    if isinstance(dataset, Txt2ImgIterableBaseDataset):
-        split_size = dataset.num_records // worker_info.num_workers
-        # reset num_records to the true number to retain reliable length information
-        dataset.sample_ids = dataset.valid_ids[
-                             worker_id * split_size:(worker_id + 1) * split_size]
-        current_id = np.random.choice(len(np.random.get_state()[1]), 1)
-        return np.random.seed(np.random.get_state()[1][current_id] + worker_id)
-    else:
-        return np.random.seed(np.random.get_state()[1][0] + worker_id)
+    return np.random.seed(np.random.get_state()[1][0] + worker_id)
 
-########################################################################################
-########################################################################################
-### MACHEX
-########################################################################################
-########################################################################################
-class ChestXrayDataset(Dataset):
-    """Class for handling datasets in the MaCheX composition."""
-
-    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
-        """Initialize ChestXrayDataset."""
-        self.root = root
-        json_path = os.path.join(self.root, 'index.json')
-        self.index_dict = ChestXrayDataset._load_json(json_path)
-
-        self.keys = list(self.index_dict.keys())
-
-        if transforms is None:
-            self.transforms = ToTensor()
-        else:
-            self.transforms = transforms
-
-    @staticmethod
-    def _load_json(file_path: str) -> Dict:
-        """Load a json file as dictionary."""
-        with open(file_path, 'r') as f:
-            return json.load(f)
-
-    def __len__(self):
-        """Return length of the dataset."""
-        return len(self.keys)
-
-    def __getitem__(self, idx: int) -> Dict:
-        """Get dataset element."""
-        meta = self.index_dict[self.keys[idx]]
-
-        img = Image.open(meta['path'])
-        img = self.transforms(img)
-
-        return {'img': img}
-
-
-class MaCheXDataset(Dataset):
-    """Massive chest X-ray dataset."""
-
-    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
-        """Initialize MaCheXDataset"""
-        self.root = root
-        sub_dataset_roots = os.listdir(self.root)
-        datasets = [
-            ChestXrayDataset(root=os.path.join(root, r), transforms=transforms)
-            for r in sub_dataset_roots
-        ]
-        self.ds = ConcatDataset(datasets)
-
-    def __len__(self):
-        """Return length of the dataset."""
-        return len(self.ds)
-
-    def __getitem__(self, idx: int) -> Dict:
-        """Get dataset element."""
-        return self.ds[idx]
-
-
-class MimicT2IDataset(ChestXrayDataset):
-    """Mimic subset with reports."""
-
-    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
-        root = os.path.join(root, 'mimic')
-        super().__init__(root, transforms)
-
-    def __getitem__(self, idx: int) -> Dict:
-        """Get dataset element."""
-        meta = self.index_dict[self.keys[idx]]
-
-        img = Image.open(meta['path'])
-        img = self.transforms(img)
-
-        return {'img': img, 'caption': meta['report']}
-
-
-
-########################################################################################
-########################################################################################
 
 class DataModuleFromConfig(pl.LightningDataModule):
 
@@ -285,7 +165,6 @@ class DataModuleFromConfig(pl.LightningDataModule):
             (train_size, test_size),
             generator=torch.Generator().manual_seed(1337)
         )
-
 
     def train_dataloader(self):
         loader = DataLoader(
@@ -624,7 +503,7 @@ if __name__ == "__main__":
             'wandb': {
                 'target': 'pytorch_lightning.loggers.WandbLogger',
                 'params': {
-                    'project': 'ldm-ae',
+                    'project': 'dummy',
                     'save_dir': logdir,
                     'offline': opt.debug,
                 }
@@ -702,18 +581,6 @@ if __name__ == "__main__":
             },
 
             'checkpoint_callback': modelckpt_cfg,
-
-            # 'metrics_over_trainsteps_checkpoint': {
-            #     "target": 'pytorch_lightning.callbacks.ModelCheckpoint',
-            #     'params': {
-            #         "dirpath": os.path.join(ckptdir, 'trainstep_checkpoints'),
-            #         "filename": "{epoch:06}-{step:09}",
-            #         "verbose": True,
-            #         'save_top_k': -1,
-            #         'every_n_train_steps': 5000,
-            #         'save_weights_only': False
-            #     }
-            # }
         }
 
         if "callbacks" in lightning_config:
@@ -736,7 +603,7 @@ if __name__ == "__main__":
         trainer.logdir = logdir  ###
 
         # data
-        data = instantiate_from_config(config.data)
+        data = DataModuleFromConfig(**config.data.params)
         # NOTE according to https://pytorch-lightning.readthedocs.io/en/latest/datamodules.html
         # calling these ourselves should not be necessary but it is.
         # lightning still takes care of proper multiprocessing though
@@ -755,16 +622,8 @@ if __name__ == "__main__":
             accumulate_grad_batches = 1
         print(f"accumulate_grad_batches = {accumulate_grad_batches}")
         lightning_config.trainer.accumulate_grad_batches = accumulate_grad_batches
-        if opt.scale_lr:
-            model.learning_rate = accumulate_grad_batches * ngpu * bs * base_lr
-            print(
-                "Setting learning rate to {:.2e} = {} (accumulate_grad_batches) * {} (num_gpus) * {} (batchsize) * {:.2e} (base_lr)".format(
-                    model.learning_rate, accumulate_grad_batches, ngpu, bs, base_lr))
-        else:
-            model.learning_rate = base_lr
-            print("++++ NOT USING LR SCALING ++++")
-            print(f"Setting learning rate to {model.learning_rate:.2e}")
 
+        print(f"Setting learning rate to {model.learning_rate:.2e}")
 
         # allow checkpointing via USR1
         def melk(*args, **kwargs):
