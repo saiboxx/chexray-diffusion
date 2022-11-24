@@ -42,7 +42,7 @@ def uniform_on_device(r1, r2, shape, device):
 
 
 class DDPM(pl.LightningModule):
-    # classic DDPM with Gaussian diffusion, in image space
+    # classic DDPM with Gaussian sr, in image space
     def __init__(self,
                  unet_config,
                  timesteps=1000,
@@ -137,7 +137,7 @@ class DDPM(pl.LightningModule):
         self.register_buffer('alphas_cumprod', to_torch(alphas_cumprod))
         self.register_buffer('alphas_cumprod_prev', to_torch(alphas_cumprod_prev))
 
-        # calculations for diffusion q(x_t | x_{t-1}) and others
+        # calculations for sr q(x_t | x_{t-1}) and others
         self.register_buffer('sqrt_alphas_cumprod', to_torch(np.sqrt(alphas_cumprod)))
         self.register_buffer('sqrt_one_minus_alphas_cumprod', to_torch(np.sqrt(1. - alphas_cumprod)))
         self.register_buffer('log_one_minus_alphas_cumprod', to_torch(np.log(1. - alphas_cumprod)))
@@ -149,7 +149,7 @@ class DDPM(pl.LightningModule):
                     1. - alphas_cumprod) + self.v_posterior * betas
         # above: equal to 1. / (1. / (1. - alpha_cumprod_tm1) + alpha_t / beta_t)
         self.register_buffer('posterior_variance', to_torch(posterior_variance))
-        # below: log calculation clipped because the posterior variance is 0 at the beginning of the diffusion chain
+        # below: log calculation clipped because the posterior variance is 0 at the beginning of the sr chain
         self.register_buffer('posterior_log_variance_clipped', to_torch(np.log(np.maximum(posterior_variance, 1e-20))))
         self.register_buffer('posterior_mean_coef1', to_torch(
             betas * np.sqrt(alphas_cumprod_prev) / (1. - alphas_cumprod)))
@@ -205,7 +205,7 @@ class DDPM(pl.LightningModule):
         """
         Get the distribution q(x_t | x_0).
         :param x_start: the [N x C x ...] tensor of noiseless inputs.
-        :param t: the number of diffusion steps (minus 1). Here, 0 means one step.
+        :param t: the number of sr steps (minus 1). Here, 0 means one step.
         :return: A tuple (mean, variance, log_variance), all of x_start's shape.
         """
         mean = (extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start)
@@ -384,7 +384,7 @@ class DDPM(pl.LightningModule):
         x = x.to(self.device)[:N]
         log["inputs"] = x
 
-        # get diffusion row
+        # get sr row
         diffusion_row = list()
         x_start = x[:n_row]
 
@@ -1281,7 +1281,7 @@ class LatentDiffusion(DDPM):
                 log["original_conditioning"] = self.to_rgb(xc)
 
         if plot_diffusion_rows:
-            # get diffusion row
+            # get sr row
             diffusion_row = list()
             z_start = z[:n_row]
             for t in range(self.num_timesteps):

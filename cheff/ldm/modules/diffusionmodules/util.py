@@ -80,7 +80,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar, max_beta=0.999):
     :param num_diffusion_timesteps: the number of betas to produce.
     :param alpha_bar: a lambda that takes an argument t from 0 to 1 and
                       produces the cumulative product of (1-beta) up to that
-                      part of the diffusion process.
+                      part of the sr process.
     :param max_beta: the maximum beta to use; use values lower than 1 to
                      prevent singularities.
     """

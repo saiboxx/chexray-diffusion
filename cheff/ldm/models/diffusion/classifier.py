@@ -42,7 +42,7 @@ class NoisyLatentImageClassifier(pl.LightningModule):
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.num_classes = num_classes
-        # get latest config of diffusion model
+        # get latest config of sr model
         diffusion_config = natsorted(glob(os.path.join(diffusion_path, 'configs', '*-project.yaml')))[-1]
         self.diffusion_config = OmegaConf.load(diffusion_config).model
         self.diffusion_config.params.ckpt_path = diffusion_ckpt_path
@@ -56,7 +56,7 @@ class NoisyLatentImageClassifier(pl.LightningModule):
         self.label_key = label_key if not hasattr(self.diffusion_model, 'cond_stage_key') \
             else self.diffusion_model.cond_stage_key
 
-        assert self.label_key is not None, 'label_key neither in diffusion model nor in model.params'
+        assert self.label_key is not None, 'label_key neither in sr model nor in model.params'
 
         if self.label_key not in __models__:
             raise NotImplementedError()
