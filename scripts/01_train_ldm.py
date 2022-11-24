@@ -421,7 +421,7 @@ if __name__ == "__main__":
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
     # add cwd for convenience and to make classes in this file available when
-    # running as `python main.py`
+    # running as `python 01_train_ldm.py`
     # (in particular `main.DataModuleFromConfig`)
     sys.path.append(os.getcwd())
 
@@ -467,7 +467,7 @@ if __name__ == "__main__":
         logdir = os.path.join(opt.logdir, nowname)
 
     ckptdir = os.path.join(logdir, "checkpoints")
-    cfgdir = os.path.join(logdir, "configs")
+    cfgdir = os.path.join(logdir, "../configs")
     seed_everything(opt.seed)
 
     try:
