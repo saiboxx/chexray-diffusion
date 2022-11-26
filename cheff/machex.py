@@ -2,6 +2,7 @@ import json
 import os
 from typing import Dict, Optional
 
+import torch
 from PIL import Image
 from torch.utils.data import Dataset, ConcatDataset
 from torchvision.transforms import Compose, ToTensor
@@ -80,3 +81,44 @@ class MimicT2IDataset(ChestXrayDataset):
         img = self.transforms(img)
 
         return {'img': img, 'caption': meta['report']}
+
+
+class LabelChestXrayDataset(ChestXrayDataset):
+    """A Chest X-ray dataset that returns class labels."""
+
+    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
+        super().__init__(root, transforms)
+        keys = []
+        for key in self.keys:
+            if self.index_dict[key].get('class_label') is not None:
+                keys.append(key)
+        self.keys = keys
+
+    def __getitem__(self, idx: int) -> Dict:
+        """Get dataset element."""
+        meta = self.index_dict[self.keys[idx]]
+
+        img = Image.open(meta['path'])
+        img = self.transforms(img)
+
+        return {'img': img, 'class_label': torch.tensor(meta['class_label']).float()}
+
+
+class CombinedLabelChestXrayDataset(Dataset):
+    def __init__(self, root: str, transforms: Optional[Compose] = None) -> None:
+        """Initialize MaCheXDataset"""
+        self.root = root
+        sub_dataset_roots = ['mimic', 'chexpert']
+        datasets = [
+            LabelChestXrayDataset(root=os.path.join(root, r), transforms=transforms)
+            for r in sub_dataset_roots
+        ]
+        self.ds = ConcatDataset(datasets)
+
+    def __len__(self):
+        """Return length of the dataset."""
+        return len(self.ds)
+
+    def __getitem__(self, idx: int) -> Dict:
+        """Get dataset element."""
+        return self.ds[idx]

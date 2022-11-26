@@ -33,9 +33,30 @@ class ClassEmbedder(nn.Module):
         return c
 
 
+class MultiClassEmbedder(nn.Module):
+    def __init__(self, embed_dim, n_classes=1000, key='class'):
+        super().__init__()
+        self.key = key
+        self.embedding = nn.Sequential(
+            nn.Linear(in_features=n_classes, out_features=embed_dim),
+            nn.GELU(),
+            nn.Linear(in_features=embed_dim, out_features=embed_dim),
+            nn.GELU(),
+            nn.Linear(in_features=embed_dim, out_features=embed_dim),
+        )
+
+    def forward(self, batch, key=None):
+        if key is None:
+            key = self.key
+        c = batch[key]
+        c = self.embedding(c)
+        c = c.unsqueeze(1)
+        return c
+
+
 class TransformerEmbedder(AbstractEncoder):
     """Some transformer encoder layers"""
-    def __init__(self, n_embed, n_layer, vocab_size, max_seq_len=77, device="cuda"):
+    def __init__(self, n_embed, n_layer, vocab_size, max_seq_len=150, device="cuda"):
         super().__init__()
         self.device = device
         self.transformer = TransformerWrapper(num_tokens=vocab_size, max_seq_len=max_seq_len,
