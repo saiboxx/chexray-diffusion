@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 2.0e-06
-  target: cheff.ldm.models.sr.ddpm.LatentDiffusion
+  target: cheff.ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.0015
     linear_end: 0.0195
