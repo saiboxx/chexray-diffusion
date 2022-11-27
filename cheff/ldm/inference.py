@@ -175,7 +175,7 @@ class CheffLDMT2I(CheffLDM):
         samples, _ = ddim.sample(
             sampling_steps,
             conditioning=conditioning,
-            batch_size=1,
+            batch_size=batch_size,
             shape=self.sample_shape,
             eta=eta,
             verbose=False
@@ -260,7 +260,7 @@ class CheffLDMClass(CheffLDM):
         samples, _ = ddim.sample(
             sampling_steps,
             conditioning=conditioning,
-            batch_size=1,
+            batch_size=batch_size,
             shape=self.sample_shape,
             eta=eta,
             verbose=False
