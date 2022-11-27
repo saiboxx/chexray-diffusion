@@ -63,22 +63,25 @@ class CheffLDM:
         self.model.model = self.model.model.to(self.device)
         self.model.eval()
 
+        self.sample_shape = [
+            self.model.model.diffusion_model.in_channels,
+            self.model.model.diffusion_model.image_size,
+            self.model.model.diffusion_model.image_size
+        ]
+
+    @torch.no_grad()
     def sample(
             self,
             batch_size: int = 1,
             sampling_steps: int = 100,
             eta: float = 1.0,
             decode: bool = True,
+            *args,
+            **kwargs
     ) -> Tensor:
-        shape = [
-            self.model.model.diffusion_model.in_channels,
-            self.model.model.diffusion_model.image_size,
-            self.model.model.diffusion_model.image_size
-        ]
-
         ddim = DDIMSampler(self.model)
         samples, _ = ddim.sample(
-            sampling_steps, batch_size=batch_size, shape=shape, eta=eta, verbose=False
+            sampling_steps, batch_size=batch_size, shape=self.sample_shape, eta=eta, verbose=False
         )
 
         if decode:
@@ -89,7 +92,7 @@ class CheffLDM:
     def _init_checkpoint(
             self, model_path: str, ae_path: Optional[str] = None
     ) -> LatentDiffusion:
-        config_dict = CheffLDM._get_config_dict(ae_path)
+        config_dict = self._get_config_dict(ae_path)
         model = LatentDiffusion(**config_dict)
 
         state_dict = torch.load(model_path, map_location=self.device)
@@ -100,7 +103,7 @@ class CheffLDM:
     def _get_config_dict(ae_path: Optional[str] = None) -> Dict:
         return {
             'linear_start': 0.0015,
-            'linear_end': 0.0195,
+            'linear_end': 0.0295,
             'num_timesteps_cond': 1,
             'log_every_t': 200,
             'timesteps': 1000,
@@ -149,5 +152,172 @@ class CheffLDM:
                     'dropout': 0.0
                 },
                 'lossconfig': {'target': 'torch.nn.Identity'}
+            }
+        }
+
+
+class CheffLDMT2I(CheffLDM):
+
+    @torch.no_grad()
+    def sample(
+            self,
+            batch_size: int = 1,
+            sampling_steps: int = 100,
+            eta: float = 1.0,
+            decode: bool = True,
+            conditioning: str = '',
+            *args,
+            **kwargs,
+    ) -> Tensor:
+        conditioning = self.model.get_learned_conditioning(conditioning)
+
+        ddim = DDIMSampler(self.model)
+        samples, _ = ddim.sample(
+            sampling_steps,
+            conditioning=conditioning,
+            batch_size=1,
+            shape=self.sample_shape,
+            eta=eta,
+            verbose=False
+        )
+
+        if decode:
+            samples = self.model.decode_first_stage(samples)
+
+        return samples
+
+    @staticmethod
+    def _get_config_dict(ae_path: Optional[str] = None) -> Dict:
+        return {
+            'linear_start': 0.0015,
+            'linear_end': 0.0295,
+            'num_timesteps_cond': 1,
+            'log_every_t': 200,
+            'timesteps': 1000,
+            'first_stage_key': 'image',
+            'cond_stage_key': 'caption',
+            'image_size': 64,
+            'channels': 3,
+            'cond_stage_trainable': True,
+            'conditioning_key': 'crossattn',
+            'monitor': 'val/loss_simple_ema',
+            'scale_factor': 0.18215,
+            'unet_config': CheffLDMT2I._get_unet_config_dict(),
+            'first_stage_config': CheffLDMT2I._get_first_stage_config_dict(ae_path),
+            'cond_stage_config': CheffLDMT2I._get_cond_config_dict()
+        }
+
+    @staticmethod
+    def _get_cond_config_dict() -> Dict:
+        return {
+            'target': 'cheff.ldm.modules.encoders.modules.BERTEmbedder',
+            'params': {
+                'n_embed': 1280,
+                'n_layer': 32,
+            }
+        }
+
+    @staticmethod
+    def _get_unet_config_dict() -> Dict:
+        return {
+            'target': 'cheff.ldm.modules.diffusionmodules.openaimodel.UNetModel',
+            'params': {
+                'image_size': 64,
+                'in_channels': 3,
+                'out_channels': 3,
+                'model_channels': 224,
+                'attention_resolutions': [8, 4, 2],
+                'num_res_blocks': 2,
+                'channel_mult': [1, 2, 4, 4],
+                'num_heads': 8,
+                'use_spatial_transformer': True,
+                'transformer_depth': 1,
+                'context_dim': 1280,
+                'use_checkpoint': True,
+                'legacy': False,
+            }
+        }
+
+
+class CheffLDMClass(CheffLDM):
+    @torch.no_grad()
+    def sample(
+            self,
+            batch_size: int = 1,
+            sampling_steps: int = 100,
+            eta: float = 1.0,
+            decode: bool = True,
+            conditioning: Optional[Tensor] = None,
+            *args,
+            **kwargs,
+    ) -> Tensor:
+        if conditioning is None:
+            conditioning = torch.zeros(1, 13, device=self.device)
+
+        conditioning = self.model.cond_stage_model({'class_label': conditioning})
+
+        ddim = DDIMSampler(self.model)
+        samples, _ = ddim.sample(
+            sampling_steps,
+            conditioning=conditioning,
+            batch_size=1,
+            shape=self.sample_shape,
+            eta=eta,
+            verbose=False
+        )
+
+        if decode:
+            samples = self.model.decode_first_stage(samples)
+
+        return samples
+
+    @staticmethod
+    def _get_config_dict(ae_path: Optional[str] = None) -> Dict:
+        return {
+            'linear_start': 0.0015,
+            'linear_end': 0.0295,
+            'num_timesteps_cond': 1,
+            'log_every_t': 200,
+            'timesteps': 1000,
+            'first_stage_key': 'image',
+            'cond_stage_key': 'class_label',
+            'image_size': 64,
+            'channels': 3,
+            'cond_stage_trainable': True,
+            'conditioning_key': 'crossattn',
+            'monitor': 'val/loss',
+            'use_ema': False,
+            'unet_config': CheffLDMClass._get_unet_config_dict(),
+            'first_stage_config': CheffLDMClass._get_first_stage_config_dict(ae_path),
+            'cond_stage_config': CheffLDMClass._get_cond_config_dict()
+        }
+
+    @staticmethod
+    def _get_cond_config_dict() -> Dict:
+        return {
+            'target': 'cheff.ldm.modules.encoders.modules.MultiClassEmbedder',
+            'params': {
+                'n_classes': 13,
+                'embed_dim': 256,
+                'key': 'class_label',
+            }
+        }
+
+    @staticmethod
+    def _get_unet_config_dict() -> Dict:
+        return {
+            'target': 'cheff.ldm.modules.diffusionmodules.openaimodel.UNetModel',
+            'params': {
+                'image_size': 64,
+                'in_channels': 3,
+                'out_channels': 3,
+                'model_channels': 224,
+                'attention_resolutions': [8, 4, 2],
+                'num_res_blocks': 2,
+                'channel_mult': [1, 2, 3, 4],
+                'num_heads': 1,
+                'use_spatial_transformer': True,
+                'transformer_depth': 1,
+                'context_dim': 256,
             }
         }

@@ -8,16 +8,16 @@ model:
     log_every_t: 200
     timesteps: 1000
     first_stage_key: image
-    cond_stage_key: caption
+    cond_stage_key: class_label
     image_size: 64
     channels: 3
     cond_stage_trainable: true
     conditioning_key: crossattn
-    monitor: val/loss_simple_ema
-    scale_factor: 0.18215
+    monitor: val/loss
+    use_ema: False
 
     unet_config:
-      target: cheff.ldm.modules.diffusionmodules.openaimodel.UNetModel
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64
         in_channels: 3
@@ -31,21 +31,18 @@ model:
         channel_mult:
         - 1
         - 2
+        - 3
         - 4
-        - 4
-        num_heads: 8
+        num_heads: 1
         use_spatial_transformer: true
         transformer_depth: 1
-        context_dim: 1280
-        use_checkpoint: true
-        legacy: False
+        context_dim: 256
 
     first_stage_config:
       target: ldm.models.autoencoder.AutoencoderKL
       params:
         embed_dim: 3
         ckpt_path: logs/2022-10-06T10-05-37_chex-ae-mcml/checkpoints/last.ckpt
-        #ckpt_path: checkpoints/autoencoder_64.ckpt
         ddconfig:
           double_z: True
           z_channels: 3
@@ -63,22 +60,21 @@ model:
         lossconfig:
           target: torch.nn.Identity
 
-
     cond_stage_config:
-      target: cheff.ldm.modules.encoders.modules.BERTEmbedder
+      target: ldm.modules.encoders.modules.MultiClassEmbedder
       params:
-        n_embed: 1280
-        n_layer: 32
-
+        n_classes: 13
+        embed_dim: 256
+        key: class_label
 
 data:
   params:
-    batch_size: 8
+    batch_size: 64
     machex_path: /dss/dssmcmlfs01/pr74ze/pr74ze-dss-0001/ru84kap/machex
-    #machex_path: /data/core-rad/machex
     test_size: 10000
     num_workers: 16
-    mimic: true
+    class_label: true
+
 
 lightning:
   callbacks:
@@ -90,5 +86,5 @@ lightning:
         increase_log_steps: False
 
   trainer:
-    gpus: 4
+    gpus: 1
     benchmark: False

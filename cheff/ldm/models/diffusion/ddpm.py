@@ -525,6 +525,9 @@ class LatentDiffusion(DDPM):
         else:
             assert config != '__is_first_stage__'
             assert config != '__is_unconditional__'
+
+            if self.cond_stage_key == 'caption':
+                config['params'].update({'device': str(self.device)})
             model = instantiate_from_config(config)
             self.cond_stage_model = model
 
