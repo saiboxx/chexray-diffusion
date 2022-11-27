@@ -28,11 +28,13 @@ class CheffSRModel:
             dim_mults=(1, 2, 4, 8, 16, 32, 32, 32),
         )
 
-        state_dict = torch.load(model_path, map_location=self.device)
+        state_dict = torch.load(model_path, map_location='cpu')
         self.model.load_state_dict(state_dict['model'])
+        self.model.to(self.device)
         self.model.eval()
 
-        self.schedule = ScheduleFactory.get_schedule(name='cosine', timesteps=2000)
+        self.schedule = ScheduleFactory.get_schedule(
+            name='cosine', timesteps=2000, device=self.device)
 
     def sample_directory(
             self,
@@ -45,6 +47,8 @@ class CheffSRModel:
     ) -> None:
         ds = DirectoryDataset(source_dir)
         loader = DataLoader(ds, batch_size=batch_size, pin_memory=True)
+
+        os.makedirs(target_dir, exist_ok=True)
 
         for f_names, imgs in loader:
             imgs_sr = self.sample(imgs, method, sampling_steps, eta)
