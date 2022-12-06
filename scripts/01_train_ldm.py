@@ -503,7 +503,7 @@ if __name__ == "__main__":
             'wandb': {
                 'target': 'pytorch_lightning.loggers.WandbLogger',
                 'params': {
-                    'project': 'dummy',
+                    'project': 'cheff',
                     'save_dir': logdir,
                     'offline': opt.debug,
                 }
@@ -550,7 +550,7 @@ if __name__ == "__main__":
         # add callback which sets up log directory
         default_callbacks_cfg = {
             "setup_callback": {
-                "target": "main.SetupCallback",
+                "target": "scripts.01_train_ldm.SetupCallback",
                 "params": {
                     "resume": opt.resume,
                     "now": now,
@@ -562,22 +562,15 @@ if __name__ == "__main__":
                 }
             },
             "image_logger": {
-                "target": "main.ImageLogger",
+                "target": "scripts.01_train_ldm.ImageLogger",
                 "params": {
                     "batch_frequency": 750,
                     "max_images": 4,
                     "clamp": True
                 }
             },
-            "learning_rate_logger": {
-                "target": "main.LearningRateMonitor",
-                "params": {
-                    "logging_interval": "step",
-                    # "log_momentum": True
-                }
-            },
             "cuda_callback": {
-                "target": "main.CUDACallback"
+                "target": "scripts.01_train_ldm.CUDACallback"
             },
 
             'checkpoint_callback': modelckpt_cfg,
