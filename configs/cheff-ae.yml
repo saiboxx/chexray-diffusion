@@ -27,14 +27,14 @@ model:
 data:
   params:
     batch_size: 8
-    machex_path: /dss/dssmcmlfs01/pr74ze/pr74ze-dss-0001/ru84kap/machex
+    machex_path: /machex
     test_size: 25000
     num_workers: 16
 
 lightning:
   callbacks:
     image_logger:
-      target: main.ImageLogger
+      target: scripts.01_train_ldm.ImageLogger
       params:
         batch_frequency: 2500
         max_images: 8
