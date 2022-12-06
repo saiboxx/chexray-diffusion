@@ -13,10 +13,10 @@ The cheff pipeline consists of three cascading phases:
 3. Refinement and upscaling using a super-resolution diffusion process
 
 Phase 1 and 2 together define an LDM.
-Phase 2 and 3 are trained on MaCheX, collection of over 650,000 chest X-rays and thus,
+Phase 2 and 3 are trained on MaCheX, a collection of over 650,000 chest X-rays and thus,
 build a foundational basis for our model stack.
 The first phase is task-specific. For unconditional snythesis, we train on full MaCheX
-and for text-conditioning we use the MIMIC subset.
+and for report-to-chest-X-ray we use the MIMIC subset.
 
 <p align="center">
 <img src=assets/cheff_overview.png />
@@ -24,18 +24,18 @@ and for text-conditioning we use the MIMIC subset.
 
 ## How to use Cheff?
 
-Please have a look into our [tutorial notebook](notebooks/01_cheff.ipynb)
+Please have a look into our [tutorial notebook](notebooks/01_cheff.ipynb).
 
 
 ## Models
 
 We provide the weights for 5 models:
 
-- Chest X-ray autoencoder: [Klick](https://weights.released.on.accept)
-- Chest X-ray super-resolution diffusion model base: [Klick](https://weights.released.on.accept)
-- Chest X-ray super-resolution diffusion model finetuned: [Klick](https://weights.released.on.accept)
-- Chest X-ray unconditioned semantic diffusion model: [Klick](https://weights.released.on.accept)
-- Chest X-ray report-conditioned semantic diffusion model: [Klick](https://weights.released.on.accept)
+- Chest X-ray autoencoder: [Click](https://weights.released.on.accept)
+- Chest X-ray super-resolution diffusion model base: [Click](https://weights.released.on.accept)
+- Chest X-ray super-resolution diffusion model finetuned: [Click](https://weights.released.on.accept)
+- Chest X-ray unconditioned semantic diffusion model: [Click](https://weights.released.on.accept)
+- Chest X-ray report-conditioned semantic diffusion model: [Click](https://weights.released.on.accept)
 
 ## Training
 
