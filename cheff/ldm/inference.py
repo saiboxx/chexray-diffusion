@@ -161,7 +161,6 @@ class CheffLDMT2I(CheffLDM):
     @torch.no_grad()
     def sample(
             self,
-            batch_size: int = 1,
             sampling_steps: int = 100,
             eta: float = 1.0,
             decode: bool = True,
@@ -175,7 +174,7 @@ class CheffLDMT2I(CheffLDM):
         samples, _ = ddim.sample(
             sampling_steps,
             conditioning=conditioning,
-            batch_size=batch_size,
+            batch_size=1,
             shape=self.sample_shape,
             eta=eta,
             verbose=False
