@@ -37,7 +37,7 @@ model:
       target: cheff.ldm.models.autoencoder.AutoencoderKL
       params:
         embed_dim: 3
-        ckpt_path: last.ckpt
+        ckpt_path: trained_models/cheff_autoencoder.pt
         ddconfig:
           double_z: True
           z_channels: 3

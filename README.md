@@ -31,17 +31,21 @@ Please have a look into our [tutorial notebook](notebooks/01_cheff.ipynb).
 
 We provide the weights for 5 models:
 
-- Chest X-ray autoencoder: [Click](https://weights.released.on.accept)
-- Chest X-ray super-resolution diffusion model base: [Click](https://weights.released.on.accept)
-- Chest X-ray super-resolution diffusion model finetuned: [Click](https://weights.released.on.accept)
-- Chest X-ray unconditioned semantic diffusion model: [Click](https://weights.released.on.accept)
-- Chest X-ray report-conditioned semantic diffusion model: [Click](https://weights.released.on.accept)
+- Chest X-ray autoencoder: [Click!](https://syncandshare.lrz.de/getlink/fiQ6wTe7K7otQzyifNh9av/cheff_autoencoder.pt)
+- Chest X-ray unconditioned semantic diffusion model: [Click!](https://syncandshare.lrz.de/getlink/fiE9pKbK38wzEvBrBCk95W/cheff_diff_uncond.pt)
+- Chest X-ray report-conditioned semantic diffusion model: [Click!](https://syncandshare.lrz.de/getlink/fi4R87B3cEWgSx4Wivyizb/cheff_diff_t2i.pt)
+- Chest X-ray super-resolution diffusion model base: [Click!](https://syncandshare.lrz.de/getlink/fiovQdSGXiTuWQ7scu7FA/cheff_sr_base.pt)
+- Chest X-ray super-resolution diffusion model finetuned: [Click!](https://syncandshare.lrz.de/getlink/fiHM4uAfy7uxcfBXkefySJ/cheff_sr_fine.pt)
+
+The [tutorial notebook](notebooks/01_cheff.ipynb) assumes that downloaded models are
+placed in `trained_models`.
 
 ## Training
 
 Our codebase builds heavily on the classic LDM repository. Thus, we share the same
 interface with a few adaptions.
 A conda environment file for installing necessary dependencies is `environment.yml`.
+For a pip-only install use `requirements.txt`.
 The full config files are located in `configs`. After adjusting the paths, the training
 can be started as follows:
 
@@ -54,3 +58,18 @@ python scripts/01_train_ldm.py -b <path/to/config.yml> -t --no-test
 
 This code builds heavily on the implementation of LDMs and DDPMs from CompVis:
 [Repository here](https://github.com/CompVis/latent-diffusion).
+
+
+## Citation
+
+If you use **Cheff** or our repository in your research, please cite our paper *Cascaded Latent Diffusion Models for High-Resolution Chest X-ray Synthesis*:
+
+```
+@inproceedings{weber2023cascaded,
+  title={Cascaded Latent Diffusion Models for High-Resolution Chest X-ray Synthesis},
+  author={Weber, Tobias and Ingrisch, Michael and Bischl, Bernd and R{\"u}gamer, David},
+  booktitle={Advances in Knowledge Discovery and Data Mining: 27th Pacific-Asia Conference, PAKDD 2023},
+  year={2023},
+  organization={Springer}
+}
+```
