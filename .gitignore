@@ -1,7 +1,6 @@
 .env
 .venv
 commands_dgx
-commands_mcml
 .idea
 *.egg-info
 __pycache__
