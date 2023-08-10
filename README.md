@@ -53,6 +53,12 @@ can be started as follows:
 python scripts/01_train_ldm.py -b <path/to/config.yml> -t --no-test
 ```
 
+### Training the Super-Resolution Model
+
+The training procedure for reproducing `CheffSR` is located in an [extra repository](https://github.com/saiboxx/diffusion-pytorch).
+You will find a [script](https://github.com/saiboxx/diffusion-pytorch/blob/main/scripts/03_train_sr3_ddp.py) that contains the 
+necessary configuration and routine.
+
 
 ## Acknowledgements
 
