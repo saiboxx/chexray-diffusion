@@ -89,6 +89,36 @@ class CheffLDM:
 
         return samples
 
+    @torch.no_grad()
+    def sample_inpaint(
+            self,
+            target_img: Tensor,
+            mask: Tensor,
+            sampling_steps: int = 100,
+            eta: float = 1.0,
+            decode: bool = True,
+            *args,
+            **kwargs
+    ) -> Tensor:
+        # Encode original image via AE
+        target_enc = self.model.encode_first_stage(target_img).mode()
+
+        ddim = DDIMSampler(self.model)
+        samples, _ = ddim.sample(
+            sampling_steps,
+            batch_size=target_img.shape[0],
+            shape=self.sample_shape,
+            eta=eta,
+            verbose=False,
+            mask=mask,
+            x0=target_enc
+        )
+
+        if decode:
+            samples = self.model.decode_first_stage(samples)
+
+        return samples
+
     def _init_checkpoint(
             self, model_path: str, ae_path: Optional[str] = None
     ) -> LatentDiffusion:
@@ -178,6 +208,41 @@ class CheffLDMT2I(CheffLDM):
             shape=self.sample_shape,
             eta=eta,
             verbose=False
+        )
+
+        if decode:
+            samples = self.model.decode_first_stage(samples)
+
+        return samples
+
+    @torch.no_grad()
+    def sample_inpaint(
+            self,
+            target_img: Tensor,
+            mask: Tensor,
+            sampling_steps: int = 100,
+            eta: float = 1.0,
+            decode: bool = True,
+            conditioning: str = '',
+            *args,
+            **kwargs
+    ) -> Tensor:
+        assert target_img.shape[0] == 1, 'Method implemented only for batch size = 1.'
+
+        # Encode original image via AE
+        target_enc = self.model.encode_first_stage(target_img).mode()
+        conditioning = self.model.get_learned_conditioning(conditioning)
+
+        ddim = DDIMSampler(self.model)
+        samples, _ = ddim.sample(
+            sampling_steps,
+            conditioning=conditioning,
+            batch_size=1,
+            shape=self.sample_shape,
+            eta=eta,
+            verbose=False,
+            mask=mask,
+            x0=target_enc
         )
 
         if decode:
