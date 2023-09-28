@@ -519,9 +519,7 @@ if __name__ == "__main__":
         default_logger_cfg = default_logger_cfgs['wandb']
         if 'logger' in lightning_config:
             logger_cfg = lightning_config.logger
-        else:
-            logger_cfg = OmegaConf.create()
-        logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
+
         trainer_kwargs['logger'] = instantiate_from_config(logger_cfg)
 
         # modelcheckpoint - use TrainResult/EvalResult(checkpoint_on=metric) to
@@ -589,6 +587,9 @@ if __name__ == "__main__":
         elif 'ignore_keys_callback' in callbacks_cfg:
             del callbacks_cfg['ignore_keys_callback']
 
+        if 'WandbLogger' not in logger_cfg['target']:
+            del callbacks_cfg['image_logger']
+
         trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k
                                        in callbacks_cfg]
 
@@ -616,6 +617,7 @@ if __name__ == "__main__":
         print(f"accumulate_grad_batches = {accumulate_grad_batches}")
         lightning_config.trainer.accumulate_grad_batches = accumulate_grad_batches
 
+        model.learning_rate = base_lr
         print(f"Setting learning rate to {model.learning_rate:.2e}")
 
         # allow checkpointing via USR1
@@ -657,11 +659,12 @@ if __name__ == "__main__":
             debugger.post_mortem()
         raise
     finally:
-        # move newly created debug project to debug_runs
-        if opt.debug and not opt.resume and trainer.global_rank == 0:
-            dst, name = os.path.split(logdir)
-            dst = os.path.join(dst, "debug_runs", name)
-            os.makedirs(os.path.split(dst)[0], exist_ok=True)
-            os.rename(logdir, dst)
-        if trainer.global_rank == 0:
-            print(trainer.profiler.summary())
+        if 'trainer' in locals():
+            # move newly created debug project to debug_runs
+            if opt.debug and not opt.resume and trainer.global_rank == 0:
+                dst, name = os.path.split(logdir)
+                dst = os.path.join(dst, "debug_runs", name)
+                os.makedirs(os.path.split(dst)[0], exist_ok=True)
+                os.rename(logdir, dst)
+            if trainer.global_rank == 0:
+                print(trainer.profiler.summary())
